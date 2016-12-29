@@ -1,22 +1,81 @@
 apply plugin: 'com.android.application'
 
+def releaseTime() {
+    return new Date().format("yyyy-MM-dd", TimeZone.getTimeZone("UTC"))
+}
+
 android {
     compileSdkVersion 24
     buildToolsVersion "25.0.0"
 
     defaultConfig {
         applicationId "com.example.chenleicpp.autobuilddemo"
-        minSdkVersion 15
-        targetSdkVersion 24
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
-    buildTypes {
+    signingConfigs {
+        debug{
+
+        }
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            storeFile file(STORE_FILE_PATH)
+            storePassword STORE_PASSWORD
+            keyAlias KEY_ALIAS
+            keyPassword KEY_PASSWORD
         }
     }
+
+    buildTypes {
+        debug{
+            applicationIdSuffix '.test.debug'
+            buildConfigField "boolean", "LOG_DEBUG", "true"
+
+            versionNameSuffix "-debug"
+            minifyEnabled false
+            zipAlignEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.debug
+        }
+        release {
+            applicationIdSuffix '.test.release'
+            buildConfigField "boolean", "LOG_DEBUG", "false"
+
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            signingConfig signingConfigs.release
+
+            applicationVariants.all { variant ->
+                variant.outputs.each { output ->
+                    def outputFile = output.outputFile
+                    if (outputFile != null && outputFile.name.endsWith('.apk')) {
+                        def fileName = "autobuilddemo_v${defaultConfig.versionName}_${releaseTime()}_${variant.productFlavors[0].name}.apk"
+                        output.outputFile = new File(outputFile.parent, fileName)
+                    }
+                }
+            }
+        }
+    }
+
+    productFlavors {
+        wandoujia {}
+        baidu {}
+    }
+
+    productFlavors.all { flavor ->
+        flavor.manifestPlaceholders = [UMENG_CHANNEL_VALUE: name]
+    }
+
+    lintOptions {
+        disable 'InvalidPackage'
+        checkReleaseBuilds false
+        // Or, if you prefer, you can continue to check for errors in release builds,
+        // but continue the build even when errors are found:
+        abortOnError false
+    }
+
 }
 
 dependencies {
@@ -24,3 +83,40 @@ dependencies {
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:appcompat-v7:24.2.1'
 }
+
+android.applicationVariants.all { variant ->
+    variant.outputs.each { output ->
+        // 删除unaligned apk
+        if (output.zipAlign != null) {
+            output.zipAlign.doLast {
+                output.zipAlign.inputFile.delete()
+            }
+        }
+    }
+}
+
+//android.applicationVariants.all { variant ->
+//    variant.outputs.each { output ->
+//        if (output.outputFile != null && output.outputFile.name.endsWith('.apk')) {
+//            def name = "${rootDir}/autobuilddemo.apk"
+//            output.outputFile = file(name)
+//        }
+//    }
+//}
+
+/*不同渠道不同代码*/
+//xiaomi { //小米渠道
+//    applicationId 'com.yuan.agradle1'//个性定制，小米市场包名不同
+//    //以下指定编译资源
+//    java.srcDirs = ['src/main1', 'src/main1/java/']
+//    res.srcDirs = ['src/main1/res']
+//    assets.srcDirs = ['assets1']
+//
+//}
+//googlepaly { //google play 渠道
+//    applicationId 'com.yuan.agradle2'
+//    //以下指定编译资源
+//    java.srcDirs = ['src/main2', 'src/main2/java/']
+//    res.srcDirs = ['src/main2/res']
+//    assets.srcDirs = ['assets2']
+//}
